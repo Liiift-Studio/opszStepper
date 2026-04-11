@@ -1,0 +1,194 @@
+// opszStepper/src/__tests__/adjust.test.ts — core algorithm tests
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
+import { applyOpszStepper, removeOpszStepper, startOpszStepper } from '../core/adjust'
+import type { OpszStepperCut, OpszStepperOptions } from '../core/types'
+
+// ─── Test helpers ─────────────────────────────────────────────────────────────
+
+/** Sample optical cuts used across multiple tests */
+const SAMPLE_CUTS: OpszStepperCut[] = [
+	{ family: 'Halyard Micro, sans-serif', maxSize: 13 },
+	{ family: 'Halyard Text, sans-serif', minSize: 13, maxSize: 28 },
+	{ family: 'Halyard Display, sans-serif', minSize: 28 },
+]
+
+/** Stub getComputedStyle to return a specific fontSize string */
+function stubFontSize(px: number): void {
+	vi.stubGlobal('getComputedStyle', (_el: Element) => ({
+		fontSize: `${px}px`,
+	}))
+}
+
+/** Create a bare HTMLElement for testing */
+function makeElement(): HTMLElement {
+	const el = document.createElement('p')
+	document.body.appendChild(el)
+	return el
+}
+
+/**
+ * Return the DOM-normalised form of a fontFamily string.
+ * happy-dom (and real browsers) wrap multi-word family names in quotes when
+ * serialising el.style.fontFamily, so "Halyard Text, sans-serif" becomes
+ * '"Halyard Text", sans-serif'. This helper lets tests compare against what
+ * the DOM will actually produce rather than the raw assignment string.
+ */
+function normFontFamily(family: string): string {
+	const probe = document.createElement('span')
+	probe.style.fontFamily = family
+	return probe.style.fontFamily
+}
+
+// ─── Tests ────────────────────────────────────────────────────────────────────
+
+describe('opszStepper', () => {
+	beforeEach(() => {
+		document.body.innerHTML = ''
+	})
+
+	afterEach(() => {
+		vi.unstubAllGlobals()
+	})
+
+	// 1. applyOpszStepper applies the correct cut for a font-size in Text range
+	it('applyOpszStepper applies the Text cut when font-size is 20px', () => {
+		stubFontSize(20)
+		const el = makeElement()
+		const options: OpszStepperOptions = { cuts: SAMPLE_CUTS }
+		applyOpszStepper(el, options)
+		expect(el.style.fontFamily).toBe(normFontFamily('Halyard Text, sans-serif'))
+	})
+
+	// 2. applyOpszStepper applies the Micro cut when font-size is below 13px
+	it('applyOpszStepper applies the Micro cut when font-size is 10px', () => {
+		stubFontSize(10)
+		const el = makeElement()
+		applyOpszStepper(el, { cuts: SAMPLE_CUTS })
+		expect(el.style.fontFamily).toBe(normFontFamily('Halyard Micro, sans-serif'))
+	})
+
+	// 3. applyOpszStepper applies the Display cut when font-size is 32px
+	it('applyOpszStepper applies the Display cut when font-size is 32px', () => {
+		stubFontSize(32)
+		const el = makeElement()
+		applyOpszStepper(el, { cuts: SAMPLE_CUTS })
+		expect(el.style.fontFamily).toBe(normFontFamily('Halyard Display, sans-serif'))
+	})
+
+	// 4. applyOpszStepper is a no-op if cuts array is empty
+	it('applyOpszStepper is a no-op when cuts is empty', () => {
+		stubFontSize(20)
+		const el = makeElement()
+		el.style.fontFamily = 'Original Family, serif'
+		const expected = normFontFamily('Original Family, serif')
+		applyOpszStepper(el, { cuts: [] })
+		expect(el.style.fontFamily).toBe(expected)
+	})
+
+	// 5. applyOpszStepper uses Infinity/0 defaults for missing minSize/maxSize
+	it('applyOpszStepper handles cuts with missing minSize (defaults to 0)', () => {
+		stubFontSize(5)
+		const el = makeElement()
+		// Only one cut with no minSize — should match any size >= 0
+		applyOpszStepper(el, { cuts: [{ family: 'Micro Cut, sans-serif', maxSize: 13 }] })
+		expect(el.style.fontFamily).toBe(normFontFamily('Micro Cut, sans-serif'))
+	})
+
+	it('applyOpszStepper handles cuts with missing maxSize (defaults to Infinity)', () => {
+		stubFontSize(999)
+		const el = makeElement()
+		// Only one cut with no maxSize — should match any large size
+		applyOpszStepper(el, { cuts: [{ family: 'Display Cut, serif', minSize: 28 }] })
+		expect(el.style.fontFamily).toBe(normFontFamily('Display Cut, serif'))
+	})
+
+	// 6. removeOpszStepper restores original fontFamily
+	it('removeOpszStepper restores the original fontFamily after applyOpszStepper', () => {
+		stubFontSize(20)
+		const el = makeElement()
+		el.style.fontFamily = 'My Original Font, serif'
+		const originalNorm = normFontFamily('My Original Font, serif')
+		applyOpszStepper(el, { cuts: SAMPLE_CUTS })
+		expect(el.style.fontFamily).toBe(normFontFamily('Halyard Text, sans-serif'))
+		removeOpszStepper(el)
+		expect(el.style.fontFamily).toBe(originalNorm)
+	})
+
+	// 7. removeOpszStepper is a no-op if never applied
+	it('removeOpszStepper does not throw if called on an untouched element', () => {
+		const el = makeElement()
+		el.style.fontFamily = 'Untouched Font, serif'
+		const expected = normFontFamily('Untouched Font, serif')
+		expect(() => removeOpszStepper(el)).not.toThrow()
+		// fontFamily should remain unchanged
+		expect(el.style.fontFamily).toBe(expected)
+	})
+
+	// 8. startOpszStepper returns a function (the stop function)
+	it('startOpszStepper returns a function', () => {
+		stubFontSize(20)
+		const el = makeElement()
+		const stop = startOpszStepper(el, { cuts: SAMPLE_CUTS })
+		expect(typeof stop).toBe('function')
+		stop()
+	})
+
+	// 9. Stop function restores original fontFamily
+	it('stop function from startOpszStepper restores original fontFamily', () => {
+		stubFontSize(20)
+		const el = makeElement()
+		el.style.fontFamily = 'Original Font, serif'
+		const originalNorm = normFontFamily('Original Font, serif')
+		const stop = startOpszStepper(el, { cuts: SAMPLE_CUTS })
+		expect(el.style.fontFamily).toBe(normFontFamily('Halyard Text, sans-serif'))
+		stop()
+		expect(el.style.fontFamily).toBe(originalNorm)
+	})
+
+	// 10. startOpszStepper applies the correct cut immediately on call
+	it('startOpszStepper applies the correct cut immediately', () => {
+		stubFontSize(32)
+		const el = makeElement()
+		const stop = startOpszStepper(el, { cuts: SAMPLE_CUTS })
+		expect(el.style.fontFamily).toBe(normFontFamily('Halyard Display, sans-serif'))
+		stop()
+	})
+
+	// 11. onCutChange callback is called when cut is applied
+	it('applyOpszStepper calls onCutChange with the applied cut', () => {
+		stubFontSize(20)
+		const el = makeElement()
+		const onCutChange = vi.fn()
+		applyOpszStepper(el, { cuts: SAMPLE_CUTS, onCutChange })
+		expect(onCutChange).toHaveBeenCalledOnce()
+		expect(onCutChange).toHaveBeenCalledWith(SAMPLE_CUTS[1])
+	})
+
+	// 12. SSR guard: applyOpszStepper returns without error when window is undefined
+	it('applyOpszStepper is a no-op in SSR (no window)', () => {
+		const original = globalThis.window
+		// @ts-expect-error — intentionally removing window to simulate SSR
+		delete globalThis.window
+		const el = makeElement()
+		expect(() => applyOpszStepper(el, { cuts: SAMPLE_CUTS })).not.toThrow()
+		globalThis.window = original
+	})
+
+	// 13. Boundary: font-size exactly at minSize is inclusive (belongs to that cut)
+	it('font-size exactly at minSize boundary is assigned to the correct cut', () => {
+		// minSize: 13 is inclusive — 13px should be Text, not Micro
+		stubFontSize(13)
+		const el = makeElement()
+		applyOpszStepper(el, { cuts: SAMPLE_CUTS })
+		expect(el.style.fontFamily).toBe(normFontFamily('Halyard Text, sans-serif'))
+	})
+
+	// 14. Boundary: font-size exactly at maxSize is exclusive (belongs to the next cut)
+	it('font-size exactly at maxSize boundary belongs to the next cut (exclusive)', () => {
+		// maxSize: 28 is exclusive — 28px should be Display, not Text
+		stubFontSize(28)
+		const el = makeElement()
+		applyOpszStepper(el, { cuts: SAMPLE_CUTS })
+		expect(el.style.fontFamily).toBe(normFontFamily('Halyard Display, sans-serif'))
+	})
+})
