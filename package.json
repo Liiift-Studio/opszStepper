@@ -61,6 +61,14 @@
 	],
 	"author": "Quinn Keaveney <quinn@liiift.studio>",
 	"license": "MIT",
+	"homepage": "https://opszstepper.com",
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/Liiift-Studio/OpszStepper.git"
+	},
+	"bugs": {
+		"url": "https://github.com/Liiift-Studio/OpszStepper/issues"
+	},
 	"sideEffects": false,
 	"publishConfig": {
 		"access": "public"

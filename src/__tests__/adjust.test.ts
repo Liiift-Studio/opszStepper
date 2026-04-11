@@ -191,4 +191,80 @@ describe('opszStepper', () => {
 		applyOpszStepper(el, { cuts: SAMPLE_CUTS })
 		expect(el.style.fontFamily).toBe(normFontFamily('Halyard Display, sans-serif'))
 	})
+
+	// 15. Hysteresis: moving UP — font-size barely past boundary does not trigger switch
+	it('hysteresis holds cut when moving up but not past threshold', () => {
+		// Start in Text cut (20px). Boundary to Display is at minSize=28.
+		// With hysteresis=2, need fontSize > 28+2=30 to switch to Display.
+		stubFontSize(20)
+		const el = makeElement()
+
+		let roCallback: ResizeObserverCallback | null = null
+		vi.stubGlobal('ResizeObserver', class {
+			constructor(cb: ResizeObserverCallback) { roCallback = cb }
+			observe() {}
+			disconnect() {}
+		})
+
+		const stop = startOpszStepper(el, { cuts: SAMPLE_CUTS, hysteresis: 2 })
+		expect(el.style.fontFamily).toBe(normFontFamily('Halyard Text, sans-serif'))
+
+		// Move to 29px — raw index is Display, but only 1px past boundary; threshold is 30
+		stubFontSize(29)
+		roCallback!([{ contentRect: { width: 100 } } as ResizeObserverEntry], null as unknown as ResizeObserver)
+
+		// Should still be Text — not past the hysteresis threshold
+		expect(el.style.fontFamily).toBe(normFontFamily('Halyard Text, sans-serif'))
+		stop()
+	})
+
+	// 16. Hysteresis: moving UP — font-size clearly past threshold triggers switch
+	it('hysteresis switches cut when moving up past threshold', () => {
+		// Start in Text cut (20px). With hysteresis=2, need > 30px to switch to Display.
+		stubFontSize(20)
+		const el = makeElement()
+
+		let roCallback: ResizeObserverCallback | null = null
+		vi.stubGlobal('ResizeObserver', class {
+			constructor(cb: ResizeObserverCallback) { roCallback = cb }
+			observe() {}
+			disconnect() {}
+		})
+
+		const stop = startOpszStepper(el, { cuts: SAMPLE_CUTS, hysteresis: 2 })
+		expect(el.style.fontFamily).toBe(normFontFamily('Halyard Text, sans-serif'))
+
+		// Move to 31px — clearly past the 30px threshold
+		stubFontSize(31)
+		roCallback!([{ contentRect: { width: 100 } } as ResizeObserverEntry], null as unknown as ResizeObserver)
+
+		expect(el.style.fontFamily).toBe(normFontFamily('Halyard Display, sans-serif'))
+		stop()
+	})
+
+	// 17. Hysteresis: moving DOWN — font-size barely below boundary does not trigger switch
+	it('hysteresis holds cut when moving down but not past threshold', () => {
+		// Start in Display cut (32px). Current cut minSize=28. With hysteresis=2,
+		// need fontSize < 28-2=26 to switch down to Text.
+		stubFontSize(32)
+		const el = makeElement()
+
+		let roCallback: ResizeObserverCallback | null = null
+		vi.stubGlobal('ResizeObserver', class {
+			constructor(cb: ResizeObserverCallback) { roCallback = cb }
+			observe() {}
+			disconnect() {}
+		})
+
+		const stop = startOpszStepper(el, { cuts: SAMPLE_CUTS, hysteresis: 2 })
+		expect(el.style.fontFamily).toBe(normFontFamily('Halyard Display, sans-serif'))
+
+		// Move to 27px — raw index is Text, but 27 < 26 is false; threshold is 26
+		stubFontSize(27)
+		roCallback!([{ contentRect: { width: 100 } } as ResizeObserverEntry], null as unknown as ResizeObserver)
+
+		// Should still be Display — not past the downward hysteresis threshold
+		expect(el.style.fontFamily).toBe(normFontFamily('Halyard Display, sans-serif'))
+		stop()
+	})
 })
