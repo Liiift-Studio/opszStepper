@@ -1,6 +1,6 @@
 "use client"
 
-// Interactive demo: drag font-size slider, move cursor, or tilt device to watch opszStepper hot-swap between Cormorant cuts
+// Interactive demo: drag font-size slider, move cursor, tilt device, or simulate AR viewing distance to watch opszStepper hot-swap between Cormorant cuts
 import { useState, useDeferredValue, useEffect } from "react"
 import { OpszStepperText } from "@liiift-studio/opszstepper"
 import type { OpszStepperCut } from "@liiift-studio/opszstepper"
@@ -30,6 +30,17 @@ function CursorIcon() {
 	)
 }
 
+/** Distance/AR icon SVG — concentric arcs suggesting depth */
+function DistanceIcon() {
+	return (
+		<svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" aria-hidden>
+			<circle cx="7" cy="7" r="1.5" fill="currentColor" stroke="none" />
+			<path d="M4 7 A3 3 0 0 1 10 7" />
+			<path d="M1.5 7 A5.5 5.5 0 0 1 12.5 7" />
+		</svg>
+	)
+}
+
 /** Gyroscope icon SVG */
 function GyroIcon() {
 	return (
@@ -42,8 +53,8 @@ function GyroIcon() {
 	)
 }
 
-/** Slider with accessible label and optional subtitle */
-function Slider({ label, value, min, max, step, unit, onChange, subtitle }: {
+/** Slider with accessible label, optional subtitle, and optional annotation next to the value */
+function Slider({ label, value, min, max, step, unit, onChange, subtitle, annotation }: {
 	label: string
 	value: number
 	min: number
@@ -52,12 +63,15 @@ function Slider({ label, value, min, max, step, unit, onChange, subtitle }: {
 	unit: string
 	onChange: (v: number) => void
 	subtitle?: string
+	annotation?: string
 }) {
 	return (
 		<div className="flex flex-col gap-1">
 			<div className="flex justify-between items-baseline">
 				<span className="text-xs uppercase tracking-widest opacity-50">{label}</span>
-				<span className="tabular-nums text-xs opacity-50">{value}{unit}</span>
+				<span className="tabular-nums text-xs opacity-50">
+					{value}{unit}{annotation ? <span className="ml-1 opacity-70">{annotation}</span> : null}
+				</span>
 			</div>
 			<input
 				type="range"
@@ -106,9 +120,20 @@ export default function Demo() {
 	// Interaction modes — mutually exclusive
 	const [cursorMode, setCursorMode] = useState(false)
 	const [gyroMode, setGyroMode] = useState(false)
+	const [distanceMode, setDistanceMode] = useState(false)
 
 	// Gyro-driven value — separate from slider state to prevent mobile scroll
 	const [gyroFontSize, setGyroFontSize] = useState(32)
+
+	// Distance simulation — physical cm from viewer to AR-anchored text
+	const [distance, setDistance] = useState(80)
+
+	/** Reference distance (cm) at which baseFontSize is the apparent size */
+	const BASE_FONT_SIZE = 32
+	const REFERENCE_DISTANCE = 80
+
+	/** Font-size that would appear equivalent to BASE_FONT_SIZE at REFERENCE_DISTANCE */
+	const distanceFontSize = Math.max(8, Math.min(96, Math.round(BASE_FONT_SIZE * (REFERENCE_DISTANCE / distance))))
 
 	// Detected capabilities — resolved client-side after mount
 	const [showCursor, setShowCursor] = useState(false)
@@ -121,8 +146,8 @@ export default function Demo() {
 		setShowGyro(isTouch && 'DeviceOrientationEvent' in window)
 	}, [])
 
-	// Effective font-size: gyro-driven or slider-driven
-	const effectiveFontSize = gyroMode ? gyroFontSize : fontSize
+	// Effective font-size: distance-driven, gyro-driven, or slider-driven
+	const effectiveFontSize = distanceMode ? distanceFontSize : gyroMode ? gyroFontSize : fontSize
 
 	const dFontSize = useDeferredValue(effectiveFontSize)
 	const dHysteresis = useDeferredValue(hysteresis)
@@ -166,16 +191,18 @@ export default function Demo() {
 		}
 	}, [gyroMode])
 
-	// Toggle cursor mode — turns off gyro if active
+	// Toggle cursor mode — turns off gyro and distance if active
 	const toggleCursor = () => {
 		setGyroMode(false)
+		setDistanceMode(false)
 		setCursorMode(v => !v)
 	}
 
-	// Toggle gyro mode — requests iOS permission if needed, turns off cursor if active
+	// Toggle gyro mode — requests iOS permission if needed, turns off cursor and distance if active
 	const toggleGyro = async () => {
 		if (gyroMode) { setGyroMode(false); return }
 		setCursorMode(false)
+		setDistanceMode(false)
 		const DOE = DeviceOrientationEvent as typeof DeviceOrientationEvent & {
 			requestPermission?: () => Promise<PermissionState>
 		}
@@ -187,14 +214,36 @@ export default function Demo() {
 		}
 	}
 
-	const activeMode = cursorMode || gyroMode
+	// Toggle distance mode — turns off cursor and gyro if active
+	const toggleDistance = () => {
+		setCursorMode(false)
+		setGyroMode(false)
+		setDistanceMode(v => !v)
+	}
+
+	const activeMode = cursorMode || gyroMode || distanceMode
 	const cutInfo = CUT_LABELS[activeCut.family] ?? { name: 'Text', subtitle: '' }
 
 	return (
 		<div className="w-full flex flex-col gap-8">
 			{/* Controls */}
 			<div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-				<Slider label="Font Size" value={fontSize} min={8} max={96} step={1} unit="px" onChange={setFontSize} />
+				{!distanceMode && (
+					<Slider label="Font Size" value={fontSize} min={8} max={96} step={1} unit="px" onChange={setFontSize} />
+				)}
+				{distanceMode && (
+					<Slider
+						label="Distance"
+						value={distance}
+						min={20}
+						max={500}
+						step={5}
+						unit="cm"
+						onChange={setDistance}
+						annotation={`(effective: ${distanceFontSize}px)`}
+						subtitle="physical distance to AR-anchored text"
+					/>
+				)}
 				<Slider label="Hysteresis" value={hysteresis} min={0} max={4} step={0.5} unit="px" onChange={setHysteresis} subtitle="dead zone — size must overshoot the cut boundary by this much before switching" />
 			</div>
 
@@ -230,6 +279,19 @@ export default function Demo() {
 						<span>{gyroMode ? 'Tilt active' : 'Tilt'}</span>
 					</button>
 				)}
+				<button
+					onClick={toggleDistance}
+					title="Simulate AR viewing distance — closer text appears larger, farther text appears smaller"
+					className="flex items-center gap-1.5 text-xs px-3 py-1 rounded-full border transition-all"
+					style={{
+						borderColor: 'currentColor',
+						opacity: distanceMode ? 1 : 0.5,
+						background: distanceMode ? 'var(--btn-bg)' : 'transparent',
+					}}
+				>
+					<DistanceIcon />
+					<span>{distanceMode ? 'Distance active' : 'Distance'}</span>
+				</button>
 			</div>
 
 			{/* Active cut indicator */}
@@ -279,7 +341,9 @@ export default function Demo() {
 				{activeMode
 					? cursorMode
 						? 'Move cursor up for large sizes, down for small. Press Esc to exit.'
-						: 'Tilt device toward you for smaller sizes, upright for larger.'
+						: gyroMode
+						? 'Tilt device toward you for smaller sizes, upright for larger.'
+						: 'On smart glasses, AR-anchored text at 20 cm appears huge — at 2 m it appears tiny. The Distance slider simulates how far away the text is: as distance grows, the apparent size shrinks and opszStepper swaps to a finer optical cut.'
 					: 'Drag the font-size slider to cross the 16px and 36px thresholds — watch the typeface change. The hysteresis slider sets the dead zone: font-size must overshoot the boundary by that many pixels before the cut switches, preventing oscillation at the edge.'}
 			</p>
 		</div>
