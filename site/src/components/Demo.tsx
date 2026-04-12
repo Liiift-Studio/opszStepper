@@ -42,8 +42,8 @@ function GyroIcon() {
 	)
 }
 
-/** Slider with accessible label */
-function Slider({ label, value, min, max, step, unit, onChange }: {
+/** Slider with accessible label and optional subtitle */
+function Slider({ label, value, min, max, step, unit, onChange, subtitle }: {
 	label: string
 	value: number
 	min: number
@@ -51,6 +51,7 @@ function Slider({ label, value, min, max, step, unit, onChange }: {
 	step: number
 	unit: string
 	onChange: (v: number) => void
+	subtitle?: string
 }) {
 	return (
 		<div className="flex flex-col gap-1">
@@ -69,6 +70,7 @@ function Slider({ label, value, min, max, step, unit, onChange }: {
 				onTouchStart={e => e.stopPropagation()}
 				style={{ touchAction: 'none' }}
 			/>
+			{subtitle && <span className="text-xs opacity-30 italic">{subtitle}</span>}
 		</div>
 	)
 }
@@ -193,7 +195,7 @@ export default function Demo() {
 			{/* Controls */}
 			<div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
 				<Slider label="Font Size" value={fontSize} min={8} max={96} step={1} unit="px" onChange={setFontSize} />
-				<Slider label="Hysteresis" value={hysteresis} min={0} max={4} step={0.5} unit="px" onChange={setHysteresis} />
+				<Slider label="Hysteresis" value={hysteresis} min={0} max={4} step={0.5} unit="px" onChange={setHysteresis} subtitle="dead zone — size must overshoot the cut boundary by this much before switching" />
 			</div>
 
 			{/* Mode toggles */}
