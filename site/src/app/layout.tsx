@@ -1,8 +1,32 @@
 import type { Metadata } from "next"
 import "./globals.css"
-import { Inter } from "next/font/google"
+import { Inter, Cormorant_Display, Cormorant_Garamond, Cormorant_SC } from "next/font/google"
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-sans" })
+
+// Three Cormorant optical-size cuts — downloaded at build time, served locally
+const cormorantDisplay = Cormorant_Display({
+	subsets: ["latin"],
+	weight: ["300", "400", "600", "700"],
+	style: ["normal", "italic"],
+	variable: "--font-cormorant-display",
+	display: "swap",
+})
+
+const cormorantGaramond = Cormorant_Garamond({
+	subsets: ["latin"],
+	weight: ["300", "400", "600", "700"],
+	style: ["normal", "italic"],
+	variable: "--font-cormorant-garamond",
+	display: "swap",
+})
+
+const cormorantSC = Cormorant_SC({
+	subsets: ["latin"],
+	weight: ["300", "400", "600", "700"],
+	variable: "--font-cormorant-sc",
+	display: "swap",
+})
 
 export const metadata: Metadata = {
 	title: "Opsz Stepper — Optical font family hot-swap by font-size",
@@ -25,8 +49,14 @@ export const metadata: Metadata = {
 }
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
+	const fontClasses = [
+		inter.variable,
+		cormorantDisplay.variable,
+		cormorantGaramond.variable,
+		cormorantSC.variable,
+	].join(" ")
 	return (
-		<html lang="en" className={`h-full antialiased ${inter.variable}`}>
+		<html lang="en" className={`h-full antialiased ${fontClasses}`}>
 			<body className="min-h-full flex flex-col">{children}</body>
 		</html>
 	)
