@@ -1,11 +1,12 @@
 import type { Metadata } from "next"
 import "./globals.css"
-import { Inter, Cormorant_Display, Cormorant_Garamond, Cormorant_SC } from "next/font/google"
+import { Inter, Cormorant, Cormorant_Garamond, Cormorant_SC } from "next/font/google"
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-sans" })
 
 // Three Cormorant optical-size cuts — downloaded at build time, served locally
-const cormorantDisplay = Cormorant_Display({
+// Note: Cormorant Display is not on Google Fonts; the base Cormorant is the display-oriented cut
+const cormorantDisplay = Cormorant({
 	subsets: ["latin"],
 	weight: ["300", "400", "600", "700"],
 	style: ["normal", "italic"],
