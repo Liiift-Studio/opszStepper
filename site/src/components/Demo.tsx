@@ -344,7 +344,7 @@ export default function Demo() {
 						: gyroMode
 						? 'Tilt device toward you for smaller sizes, upright for larger.'
 						: 'On smart glasses, AR-anchored text at 20 cm appears huge — at 2 m it appears tiny. The Distance slider simulates how far away the text is: as distance grows, the apparent size shrinks and opszStepper swaps to a finer optical cut.'
-					: 'Drag the font-size slider to cross the 16px and 36px thresholds — watch the typeface change. The hysteresis slider sets the dead zone: font-size must overshoot the boundary by that many pixels before the cut switches, preventing oscillation at the edge.'}
+					: 'Drag the font-size slider to cross the 16px and 36px thresholds — watch the typeface change. The hysteresis slider sets the dead zone: font-size must overshoot the boundary by that many pixels before the cut switches, preventing oscillation at the edge. On smartwatches and micro-displays, optical cut selection is non-negotiable — the difference between a text cut and a display cut at 14px is the difference between legible and illegible.'}
 			</p>
 		</div>
 	)
