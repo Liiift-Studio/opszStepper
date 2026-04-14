@@ -1,10 +1,27 @@
 @import "tailwindcss";
 
+@font-face {
+	font-family: "Merriweather";
+	src: url("/fonts/Merriweather.woff2") format("woff2");
+	font-weight: 100 900;
+	font-style: normal;
+	font-display: swap;
+}
+
+@font-face {
+	font-family: "Merriweather";
+	src: url("/fonts/Merriweather-Italic.woff2") format("woff2");
+	font-weight: 100 900;
+	font-style: italic;
+	font-display: swap;
+}
+
 :root {
 	--background: hsl(150, 55%, 10%);
 	--foreground: #f0ece3;
 	--btn-bg: hsl(150, 35%, 18%);
 	--font-sans: sans-serif;
+	--font-merriweather: "Merriweather";
 }
 
 @theme inline {
