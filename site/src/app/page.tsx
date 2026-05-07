@@ -45,11 +45,11 @@ export default function Home() {
 				<div className="prose-grid grid grid-cols-1 sm:grid-cols-2 gap-12 text-sm leading-relaxed opacity-70">
 					<div className="flex flex-col gap-3">
 						<p className="font-semibold opacity-100 text-base">Optical sizes are different drawings</p>
-						<p>Micro, Text, and Display variants of the same typeface aren&apos;t simply scaled versions of each other. They have different stroke widths, apertures, x-heights, and spacing — each redrawn from scratch to be optically correct at its intended size range.</p>
+						<p>Micro, Text, and Display variants of the same typeface aren&rsquo;t simply scaled versions of each other. They have different stroke widths, apertures, x-heights, and spacing — each redrawn from scratch to be optically correct at its intended size range.</p>
 					</div>
 					<div className="flex flex-col gap-3">
 						<p className="font-semibold opacity-100 text-base">ResizeObserver watches the element</p>
-						<p>When the element&apos;s computed font-size changes — because of responsive CSS, viewport units, or user zoom — the ResizeObserver fires. Opsz Stepper re-reads the font-size and re-evaluates which cut to apply, keeping the typeface optically correct at every size.</p>
+						<p>When the element&rsquo;s computed font-size changes — because of responsive CSS, viewport units, or user zoom — the ResizeObserver fires. Opsz Stepper re-reads the font-size and re-evaluates which cut to apply, keeping the typeface optically correct at every size.</p>
 					</div>
 					<div className="flex flex-col gap-3">
 						<p className="font-semibold opacity-100 text-base">Hysteresis prevents oscillation</p>

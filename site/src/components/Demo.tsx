@@ -19,7 +19,7 @@ const CUT_LABELS: Record<string, { name: string; subtitle: string }> = {
 	'var(--font-cormorant-display), serif':  { name: 'Display', subtitle: 'Cormorant Display — display optical size' },
 }
 
-const DEMO_TEXT = `The geometry that works at twelve points becomes wrong at seventy-two. Type designers know this — it's why they draw separate optical-size cuts. Stroke widths, apertures, spacing: all redrawn for the intended size.`
+const DEMO_TEXT = `The geometry that works at twelve points becomes wrong at seventy-two. Type designers know this — it’s why they draw separate optical-size cuts. Stroke widths, apertures, spacing: all redrawn for the intended size.`
 
 /** Cursor icon SVG */
 function CursorIcon() {
