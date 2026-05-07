@@ -32,7 +32,7 @@ const cormorantSC = Cormorant_SC({
 export const metadata: Metadata = {
 	title: "Opsz Stepper — Optical font family hot-swap by font-size",
 	icons: { icon: "/icon.svg", shortcut: "/icon.svg", apple: "/icon.svg" },
-	description: "Opsz Stepper automatically swaps between optical size cuts of a typeface — Micro, Text, or Display — based on the element's computed font-size. Works with React, vanilla JS, or any framework.",
+	description: "Opsz Stepper automatically swaps between optical size cuts of a typeface — Micro, Text, or Display — based on the element’s computed font-size. Works with React, vanilla JS, or any framework.",
 	keywords: ["optical size", "font-size", "opsz", "optical cut", "font-family", "typography", "TypeScript", "npm", "react", "variable font"],
 	openGraph: {
 		title: "Opsz Stepper — Optical font family hot-swap by font-size",
