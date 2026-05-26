@@ -54,7 +54,7 @@ function GyroIcon() {
 }
 
 /** Slider with accessible label, optional subtitle, and optional annotation next to the value */
-function Slider({ label, value, min, max, step, unit, onChange, subtitle, annotation }: {
+function Slider({ label, value, min, max, step, unit, onChange, subtitle, annotation, title }: {
 	label: string
 	value: number
 	min: number
@@ -64,6 +64,7 @@ function Slider({ label, value, min, max, step, unit, onChange, subtitle, annota
 	onChange: (v: number) => void
 	subtitle?: string
 	annotation?: string
+	title?: string
 }) {
 	return (
 		<div className="flex flex-col gap-1">
@@ -80,6 +81,7 @@ function Slider({ label, value, min, max, step, unit, onChange, subtitle, annota
 				step={step}
 				value={value}
 				aria-label={label}
+				title={title}
 				onChange={e => onChange(Number(e.target.value))}
 				onTouchStart={e => e.stopPropagation()}
 				style={{ touchAction: 'none' }}
@@ -229,7 +231,7 @@ export default function Demo() {
 			{/* Controls */}
 			<div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
 				{!distanceMode && (
-					<Slider label="Font Size" value={fontSize} min={8} max={96} step={1} unit="px" onChange={setFontSize} />
+					<Slider label="Font Size" value={fontSize} min={8} max={96} step={1} unit="px" onChange={setFontSize} title="Drag to change the rendered font size — opszStepper automatically switches to the appropriate optical cut at each threshold (16px and 36px)" />
 				)}
 				{distanceMode && (
 					<Slider
@@ -242,9 +244,10 @@ export default function Demo() {
 						onChange={setDistance}
 						annotation={`(effective: ${distanceFontSize}px)`}
 						subtitle="physical distance to AR-anchored text"
+						title="Drag to simulate viewing distance in AR — closer text appears larger (larger effective size, coarser optical cut), farther text appears smaller (finer optical cut)"
 					/>
 				)}
-				<Slider label="Hysteresis" value={hysteresis} min={0} max={4} step={0.5} unit="px" onChange={setHysteresis} subtitle="dead zone — size must overshoot the cut boundary by this much before switching" />
+				<Slider label="Hysteresis" value={hysteresis} min={0} max={4} step={0.5} unit="px" onChange={setHysteresis} subtitle="dead zone — size must overshoot the cut boundary by this much before switching" title="Set the dead zone around each cut boundary — font-size must overshoot by this many pixels before the optical cut switches, preventing rapid oscillation when size hovers near a threshold" />
 			</div>
 
 			{/* Mode toggles */}
