@@ -47,6 +47,7 @@ export const metadata: Metadata = {
 		description: "Automatically swap between optical size cuts as font-size changes.",
 	},
 	metadataBase: new URL("https://opszstepper.com"),
+	alternates: { canonical: "https://opszstepper.com" },
 }
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
