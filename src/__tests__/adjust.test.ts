@@ -267,4 +267,170 @@ describe('opszStepper', () => {
 		expect(el.style.fontFamily).toBe(normFontFamily('Halyard Display, sans-serif'))
 		stop()
 	})
+
+	// 18. Hysteresis: moving DOWN — font-size clearly past threshold triggers switch
+	it('hysteresis switches cut when moving down past threshold', () => {
+		// Start in Display cut (32px). Current cut minSize=28. With hysteresis=2,
+		// need fontSize < 26 to switch down to Text.
+		stubFontSize(32)
+		const el = makeElement()
+
+		let roCallback: ResizeObserverCallback | null = null
+		vi.stubGlobal('ResizeObserver', class {
+			constructor(cb: ResizeObserverCallback) { roCallback = cb }
+			observe() {}
+			disconnect() {}
+		})
+
+		const stop = startOpszStepper(el, { cuts: SAMPLE_CUTS, hysteresis: 2 })
+		expect(el.style.fontFamily).toBe(normFontFamily('Halyard Display, sans-serif'))
+
+		// Move to 25px — clearly past the 26px downward threshold
+		stubFontSize(25)
+		roCallback!([{ contentRect: { width: 100 } } as ResizeObserverEntry], null as unknown as ResizeObserver)
+
+		expect(el.style.fontFamily).toBe(normFontFamily('Halyard Text, sans-serif'))
+		stop()
+	})
+
+	// 19. removeOpszStepper via stopFnMap path (startOpszStepper users)
+	it('removeOpszStepper disconnects the ResizeObserver and restores fontFamily', () => {
+		stubFontSize(20)
+		const el = makeElement()
+		el.style.fontFamily = 'Original Font, serif'
+		const originalNorm = normFontFamily('Original Font, serif')
+
+		let disconnected = false
+		vi.stubGlobal('ResizeObserver', class {
+			constructor(_cb: ResizeObserverCallback) {}
+			observe() {}
+			disconnect() { disconnected = true }
+		})
+
+		startOpszStepper(el, { cuts: SAMPLE_CUTS })
+		expect(el.style.fontFamily).toBe(normFontFamily('Halyard Text, sans-serif'))
+
+		removeOpszStepper(el)
+
+		expect(el.style.fontFamily).toBe(originalNorm)
+		expect(disconnected).toBe(true)
+	})
+
+	// 20. startOpszStepper onCutChange fires on initial apply
+	it('startOpszStepper calls onCutChange with the initial cut', () => {
+		stubFontSize(32)
+		const el = makeElement()
+
+		vi.stubGlobal('ResizeObserver', class {
+			constructor(_cb: ResizeObserverCallback) {}
+			observe() {}
+			disconnect() {}
+		})
+
+		const onCutChange = vi.fn()
+		const stop = startOpszStepper(el, { cuts: SAMPLE_CUTS, onCutChange })
+		expect(onCutChange).toHaveBeenCalledOnce()
+		expect(onCutChange).toHaveBeenCalledWith(SAMPLE_CUTS[2])
+		stop()
+	})
+
+	// 21. startOpszStepper onCutChange fires when ResizeObserver triggers a cut switch
+	it('startOpszStepper calls onCutChange when ResizeObserver triggers cut switch', () => {
+		stubFontSize(20)
+		const el = makeElement()
+
+		let roCallback: ResizeObserverCallback | null = null
+		vi.stubGlobal('ResizeObserver', class {
+			constructor(cb: ResizeObserverCallback) { roCallback = cb }
+			observe() {}
+			disconnect() {}
+		})
+
+		const onCutChange = vi.fn()
+		const stop = startOpszStepper(el, { cuts: SAMPLE_CUTS, onCutChange })
+		onCutChange.mockClear()
+
+		// Move to 32px — should switch to Display and fire onCutChange
+		stubFontSize(32)
+		roCallback!([{ contentRect: { width: 100 } } as ResizeObserverEntry], null as unknown as ResizeObserver)
+
+		expect(onCutChange).toHaveBeenCalledOnce()
+		expect(onCutChange).toHaveBeenCalledWith(SAMPLE_CUTS[2])
+		stop()
+	})
+
+	// 22. startOpszStepper SSR guard returns a no-op stop function
+	it('startOpszStepper is a no-op in SSR (no window)', () => {
+		const original = globalThis.window
+		// @ts-expect-error — intentionally removing window to simulate SSR
+		delete globalThis.window
+		const el = makeElement()
+		const stop = startOpszStepper(el, { cuts: SAMPLE_CUTS })
+		expect(typeof stop).toBe('function')
+		expect(() => stop()).not.toThrow()
+		globalThis.window = original
+	})
+
+	// 23. startOpszStepper called twice on same element — second call stops first observer
+	it('calling startOpszStepper twice stops the first observer before creating a new one', () => {
+		stubFontSize(20)
+		const el = makeElement()
+
+		let disconnectCount = 0
+		vi.stubGlobal('ResizeObserver', class {
+			constructor(_cb: ResizeObserverCallback) {}
+			observe() {}
+			disconnect() { disconnectCount++ }
+		})
+
+		const stop1 = startOpszStepper(el, { cuts: SAMPLE_CUTS })
+		// Second call should stop the first observer internally before creating a new one
+		const stop2 = startOpszStepper(el, { cuts: SAMPLE_CUTS })
+
+		// The first observer should have been disconnected by the second call
+		expect(disconnectCount).toBe(1)
+
+		stop2()
+		// Now the second observer is also disconnected
+		expect(disconnectCount).toBe(2)
+		// stop1 is now a no-op (its observer was already disconnected)
+		expect(() => stop1()).not.toThrow()
+	})
+
+	// 24. NaN guard: applyOpszStepper is a no-op when fontSize is NaN (detached element)
+	it('applyOpszStepper is a no-op when getComputedStyle returns empty string for fontSize', () => {
+		vi.stubGlobal('getComputedStyle', (_el: Element) => ({ fontSize: '' }))
+		const el = makeElement()
+		el.style.fontFamily = 'Original Font, serif'
+		const originalNorm = normFontFamily('Original Font, serif')
+		applyOpszStepper(el, { cuts: SAMPLE_CUTS })
+		// fontFamily should be unchanged — NaN guard kicked in
+		expect(el.style.fontFamily).toBe(originalNorm)
+	})
+
+	// 25. opszValue: applyCut writes font-variation-settings when cut has opszValue
+	it('applyOpszStepper writes font-variation-settings when cut has opszValue', () => {
+		stubFontSize(20)
+		const el = makeElement()
+		const cutsWithOpsz = [
+			{ family: 'Fraunces, serif', maxSize: 13, opszValue: 9, opszMin: 9, opszMax: 144 },
+			{ family: 'Fraunces, serif', minSize: 13, maxSize: 28, opszValue: 24, opszMin: 9, opszMax: 144 },
+			{ family: 'Fraunces, serif', minSize: 28, opszValue: 72, opszMin: 9, opszMax: 144 },
+		]
+		applyOpszStepper(el, { cuts: cutsWithOpsz })
+		// 20px matches cut index 1 — opszValue 24, clamped to [9,144]
+		expect(el.style.fontVariationSettings).toBe('"opsz" 24')
+	})
+
+	// 26. opszValue: clamping is applied against opszMin/opszMax
+	it('applyOpszStepper clamps opszValue to opszMin/opszMax', () => {
+		stubFontSize(5)
+		const el = makeElement()
+		// opszValue is below opszMin — should be clamped up to 9
+		const cutsWithOpsz = [
+			{ family: 'Fraunces, serif', maxSize: 13, opszValue: 1, opszMin: 9, opszMax: 144 },
+		]
+		applyOpszStepper(el, { cuts: cutsWithOpsz })
+		expect(el.style.fontVariationSettings).toBe('"opsz" 9')
+	})
 })

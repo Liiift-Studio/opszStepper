@@ -1,5 +1,5 @@
 // opszStepper/src/core/adjust.ts — framework-agnostic optical-cut hot-swap algorithm
-import type { OpszStepperCut, OpszStepperOptions } from './types'
+import type { OpszStepperCut, OpszStepperOptions, OpszStepperStop } from './types'
 
 // ─── WeakMap stores ───────────────────────────────────────────────────────────
 
@@ -90,11 +90,52 @@ function resolveHysteresisCutIndex(
 	}
 }
 
+// ─── Cut application helper ───────────────────────────────────────────────────
+
+/**
+ * Write a cut's styles to an element.
+ * Sets font-family, and — when the cut carries an opszValue — also writes
+ * font-variation-settings to drive the opsz axis of a single variable font.
+ * The opszValue is clamped between cut.opszMin and cut.opszMax when provided.
+ *
+ * Also saves window.scrollY before the write and restores it in a
+ * requestAnimationFrame, matching the project-wide scroll-restore convention
+ * (iOS Safari ignores overflow-anchor: none).
+ */
+function applyCut(el: HTMLElement, cut: OpszStepperCut): void {
+	const scrollY = window.scrollY
+
+	el.style.fontFamily = cut.family
+
+	if (cut.opszValue !== undefined) {
+		// Clamp the axis value against declared fvar bounds when supplied
+		const min = cut.opszMin ?? -Infinity
+		const max = cut.opszMax ?? Infinity
+		const clamped = Math.min(max, Math.max(min, cut.opszValue))
+		// Reset inherited axis values first, then set the opsz axis
+		el.style.fontVariationSettings = `"opsz" ${clamped}`
+	} else {
+		// When doing multi-family hot-swap, clear any inline font-variation-settings
+		// that may have been set by a prior opszValue cut or inherited from a stylesheet,
+		// to avoid orphaned axis values on the new family.
+		if (el.style.fontVariationSettings) {
+			el.style.fontVariationSettings = ''
+		}
+	}
+
+	requestAnimationFrame(() => {
+		if (Math.abs(window.scrollY - scrollY) > 2) {
+			window.scrollTo({ top: scrollY, behavior: 'instant' })
+		}
+	})
+}
+
 // ─── Public API ───────────────────────────────────────────────────────────────
 
 /**
  * One-shot application of the correct optical cut for the element's current
  * computed font-size. No ResizeObserver — use when you want manual control.
+ * Note: hysteresis is not applied here; use startOpszStepper for hysteresis support.
  *
  * @param el      - Target element
  * @param options - OpszStepperOptions
@@ -107,8 +148,11 @@ export function applyOpszStepper(el: HTMLElement, options: OpszStepperOptions): 
 	// Guard: nothing to do with an empty cuts array
 	if (!cuts || cuts.length === 0) return
 
-	const fontSize = parseFloat(getComputedStyle(el).fontSize)
-	const cutIndex = findCutIndex(cuts, fontSize)
+	const rawSize = parseFloat(getComputedStyle(el).fontSize)
+	// NaN guard: skip if element is detached or returns a non-px value
+	if (isNaN(rawSize)) return
+
+	const cutIndex = findCutIndex(cuts, rawSize)
 
 	if (cutIndex === -1) return
 
@@ -119,7 +163,7 @@ export function applyOpszStepper(el: HTMLElement, options: OpszStepperOptions): 
 		originalFamilyMap.set(el, el.style.fontFamily)
 	}
 
-	el.style.fontFamily = cut.family
+	applyCut(el, cut)
 	activeCutIndexMap.set(el, cutIndex)
 	onCutChange?.(cut)
 }
@@ -130,12 +174,14 @@ export function applyOpszStepper(el: HTMLElement, options: OpszStepperOptions): 
  * (which can cause font-size to change in responsive designs).
  *
  * Applies the correct cut immediately on first call.
+ * If called a second time on the same element, the prior observer is stopped
+ * first to avoid orphaned observers.
  *
  * @param el      - Target element
  * @param options - OpszStepperOptions
  * @returns         A stop function that disconnects the observer and restores the original fontFamily
  */
-export function startOpszStepper(el: HTMLElement, options: OpszStepperOptions): () => void {
+export function startOpszStepper(el: HTMLElement, options: OpszStepperOptions): OpszStepperStop {
 	if (typeof window === 'undefined') return () => {}
 
 	const { cuts, onCutChange } = options
@@ -144,28 +190,34 @@ export function startOpszStepper(el: HTMLElement, options: OpszStepperOptions): 
 	// Guard: nothing to observe with an empty cuts array
 	if (!cuts || cuts.length === 0) return () => {}
 
-	// Save original fontFamily before any modifications
+	// If a prior observer is already running on this element, stop it cleanly
+	// before attaching a new one to avoid orphaned observers.
+	const existingStop = stopFnMap.get(el)
+	if (existingStop) {
+		existingStop()
+	}
+
+	// Save original fontFamily before any modifications (after stopping prior
+	// observer, which may have already restored it)
 	if (!originalFamilyMap.has(el)) {
 		originalFamilyMap.set(el, el.style.fontFamily)
 	}
 
-	// Apply the correct cut immediately
-	const initialFontSize = parseFloat(getComputedStyle(el).fontSize)
-	const initialIndex = findCutIndex(cuts, initialFontSize)
-	if (initialIndex !== -1) {
-		el.style.fontFamily = cuts[initialIndex].family
-		activeCutIndexMap.set(el, initialIndex)
-		onCutChange?.(cuts[initialIndex])
-	}
+	// Apply the correct cut immediately, delegating to applyOpszStepper
+	// to avoid duplicating the read→find→write→callback sequence.
+	applyOpszStepper(el, options)
 
 	// Watch for element resize — font-size may change as a result of responsive layout
 	const ro = new ResizeObserver(() => {
-		const fontSize = parseFloat(getComputedStyle(el).fontSize)
+		const rawSize = parseFloat(getComputedStyle(el).fontSize)
+		// NaN guard: skip if element is detached or returns a non-px value
+		if (isNaN(rawSize)) return
+
 		const currentIndex = activeCutIndexMap.get(el) ?? -1
-		const newIndex = resolveHysteresisCutIndex(cuts, fontSize, currentIndex, hysteresis)
+		const newIndex = resolveHysteresisCutIndex(cuts, rawSize, currentIndex, hysteresis)
 
 		if (newIndex !== currentIndex && newIndex !== -1) {
-			el.style.fontFamily = cuts[newIndex].family
+			applyCut(el, cuts[newIndex])
 			activeCutIndexMap.set(el, newIndex)
 			onCutChange?.(cuts[newIndex])
 		}
@@ -173,11 +225,13 @@ export function startOpszStepper(el: HTMLElement, options: OpszStepperOptions): 
 
 	ro.observe(el)
 
-	const stop = () => {
+	const stop: OpszStepperStop = () => {
 		ro.disconnect()
 		const original = originalFamilyMap.get(el)
 		if (original !== undefined) {
 			el.style.fontFamily = original
+			// Also clear any inline font-variation-settings written by applyCut
+			el.style.fontVariationSettings = ''
 			originalFamilyMap.delete(el)
 		}
 		activeCutIndexMap.delete(el)
@@ -206,7 +260,11 @@ export function removeOpszStepper(el: HTMLElement): void {
 
 	// Fallback: restore from originalFamilyMap (for applyOpszStepper-only usage)
 	if (originalFamilyMap.has(el)) {
-		el.style.fontFamily = originalFamilyMap.get(el)!
+		// Use a local variable to avoid the non-null assertion on WeakMap.get()
+		const original = originalFamilyMap.get(el)
+		el.style.fontFamily = original ?? ''
+		// Clear any inline font-variation-settings written by applyCut
+		el.style.fontVariationSettings = ''
 		originalFamilyMap.delete(el)
 		activeCutIndexMap.delete(el)
 	}

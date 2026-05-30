@@ -1,12 +1,21 @@
 // opszStepper/src/react/useOpszStepper.ts — React hook for optical-cut hot-swap
 import { useLayoutEffect, useRef } from 'react'
 import { startOpszStepper } from '../core/adjust'
-import type { OpszStepperOptions } from '../core/types'
+import type { OpszStepperOptions, OpszStepperStop } from '../core/types'
 
 /**
  * React hook that starts an opszStepper observer on the returned ref'd element.
  * Calls startOpszStepper in useLayoutEffect and stores the returned stop function.
- * Stops and restarts when cuts length or hysteresis changes.
+ *
+ * Re-runs (stops and restarts the observer) whenever any cut's family, minSize, or
+ * maxSize changes, or when cuts are added/removed, or when hysteresis changes.
+ * A stable JSON serialisation of the cuts array is used as the dependency key so
+ * that same-length arrays with different content also trigger a restart.
+ *
+ * Note: onCutChange is kept in a ref and never used as a dependency — it is always
+ * read fresh from optionsRef on each observer callback, so it does not need to be
+ * stable across renders.
+ *
  * Cleans up on unmount.
  *
  * @param options - OpszStepperOptions
@@ -16,10 +25,11 @@ export function useOpszStepper(options: OpszStepperOptions) {
 	const ref = useRef<HTMLElement>(null)
 	const optionsRef = useRef(options)
 	optionsRef.current = options
-	const stopRef = useRef<(() => void) | null>(null)
+	const stopRef = useRef<OpszStepperStop | null>(null)
 
-	// Use cuts.length and hysteresis as re-run triggers (shallow deps that indicate config change)
-	const cutsLength = options.cuts.length
+	// Serialize the cuts array to a string so that same-length arrays with different
+	// content still trigger a restart. hysteresis is included directly.
+	const cutsKey = JSON.stringify(options.cuts)
 	const { hysteresis } = options
 
 	useLayoutEffect(() => {
@@ -34,7 +44,8 @@ export function useOpszStepper(options: OpszStepperOptions) {
 			stopRef.current?.()
 			stopRef.current = null
 		}
-	}, [cutsLength, hysteresis])
+	// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [cutsKey, hysteresis])
 
 	return ref
 }

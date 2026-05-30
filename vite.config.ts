@@ -15,10 +15,8 @@ export default defineConfig({
 			fileName: (format) => `index.${format === 'es' ? 'js' : 'cjs'}`,
 		},
 		rollupOptions: {
+			// Only 'es' and 'cjs' formats are emitted — no UMD/IIFE — so no globals needed.
 			external: ['react', 'react-dom', 'react/jsx-runtime'],
-			output: {
-				globals: { react: 'React', 'react-dom': 'ReactDOM' },
-			},
 		},
 	},
 })
