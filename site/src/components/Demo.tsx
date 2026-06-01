@@ -1,7 +1,7 @@
 "use client"
 
 // Interactive demo: drag font-size slider, move cursor, tilt device, or simulate AR viewing distance to watch opszStepper hot-swap between Cormorant cuts
-import { useState, useDeferredValue, useEffect } from "react"
+import { useState, useDeferredValue, useEffect, useCallback, useMemo } from "react"
 import { OpszStepperText } from "@liiift-studio/opszstepper"
 import type { OpszStepperCut } from "@liiift-studio/opszstepper"
 
@@ -20,6 +20,11 @@ const CUT_LABELS: Record<string, { name: string; subtitle: string }> = {
 }
 
 const DEMO_TEXT = `The geometry that works at twelve points becomes wrong at seventy-two. Type designers know this — it’s why they draw separate optical-size cuts. Stroke widths, apertures, spacing: all redrawn for the intended size.`
+
+/** Reference font size in px for the distance simulation */
+const BASE_FONT_SIZE = 32
+/** Reference distance in cm at which BASE_FONT_SIZE appears at nominal size */
+const REFERENCE_DISTANCE = 80
 
 /** Cursor icon SVG */
 function CursorIcon() {
@@ -53,8 +58,8 @@ function GyroIcon() {
 	)
 }
 
-/** Slider with accessible label, optional subtitle, and optional annotation next to the value */
-function Slider({ label, value, min, max, step, unit, onChange, subtitle, annotation, title }: {
+/** Slider with accessible label, optional subtitle, optional annotation, and aria-valuetext for AT */
+function Slider({ label, value, min, max, step, unit, onChange, subtitle, annotation, title, ariaValueText }: {
 	label: string
 	value: number
 	min: number
@@ -65,7 +70,10 @@ function Slider({ label, value, min, max, step, unit, onChange, subtitle, annota
 	subtitle?: string
 	annotation?: string
 	title?: string
+	/** Human-readable value for screen readers, e.g. "32px" or "80cm (effective: 32px)" */
+	ariaValueText?: string
 }) {
+	const subtitleId = subtitle ? `slider-subtitle-${label.replace(/\s+/g, '-').toLowerCase()}` : undefined
 	return (
 		<div className="flex flex-col gap-1">
 			<div className="flex justify-between items-baseline">
@@ -81,12 +89,14 @@ function Slider({ label, value, min, max, step, unit, onChange, subtitle, annota
 				step={step}
 				value={value}
 				aria-label={label}
+				aria-valuetext={ariaValueText ?? `${value}${unit}`}
+				aria-describedby={subtitleId}
 				title={title}
 				onChange={e => onChange(Number(e.target.value))}
 				onTouchStart={e => e.stopPropagation()}
 				style={{ touchAction: 'none' }}
 			/>
-			{subtitle && <span className="text-xs opacity-30 italic">{subtitle}</span>}
+			{subtitle && <span id={subtitleId} className="text-xs opacity-30 italic">{subtitle}</span>}
 		</div>
 	)
 }
@@ -95,10 +105,12 @@ function Slider({ label, value, min, max, step, unit, onChange, subtitle, annota
 function CutChips({ activeName }: { activeName: string }) {
 	const names = ['Micro', 'Text', 'Display']
 	return (
-		<div className="flex gap-2">
+		<div className="flex gap-2" role="group" aria-label="Active optical cut">
 			{names.map(name => (
 				<span
 					key={name}
+					role="status"
+					aria-current={name === activeName ? 'true' : undefined}
 					className="text-xs px-3 py-1 rounded-full border transition-opacity"
 					style={{
 						borderColor: 'currentColor',
@@ -117,7 +129,8 @@ function CutChips({ activeName }: { activeName: string }) {
 export default function Demo() {
 	const [fontSize, setFontSize] = useState(32)
 	const [hysteresis, setHysteresis] = useState(1)
-	const [activeCut, setActiveCut] = useState<OpszStepperCut>(CUTS[1])
+	// Use CUTS[1] ?? CUTS[0] to guard against a future CUTS array with only one entry
+	const [activeCut, setActiveCut] = useState<OpszStepperCut>(CUTS[1] ?? CUTS[0])
 
 	// Interaction modes — mutually exclusive
 	const [cursorMode, setCursorMode] = useState(false)
@@ -130,12 +143,14 @@ export default function Demo() {
 	// Distance simulation — physical cm from viewer to AR-anchored text
 	const [distance, setDistance] = useState(80)
 
-	/** Reference distance (cm) at which baseFontSize is the apparent size */
-	const BASE_FONT_SIZE = 32
-	const REFERENCE_DISTANCE = 80
+	// Gyro permission denied feedback — shown briefly when iOS denies sensor access
+	const [gyroDenied, setGyroDenied] = useState(false)
 
-	/** Font-size that would appear equivalent to BASE_FONT_SIZE at REFERENCE_DISTANCE */
-	const distanceFontSize = Math.max(8, Math.min(96, Math.round(BASE_FONT_SIZE * (REFERENCE_DISTANCE / distance))))
+	/** Font-size derived from viewing distance — memoised to avoid recomputing on unrelated renders */
+	const distanceFontSize = useMemo(
+		() => Math.max(8, Math.min(96, Math.round(BASE_FONT_SIZE * (REFERENCE_DISTANCE / distance)))),
+		[distance],
+	)
 
 	// Detected capabilities — resolved client-side after mount
 	const [showCursor, setShowCursor] = useState(false)
@@ -151,6 +166,8 @@ export default function Demo() {
 	// Effective font-size: distance-driven, gyro-driven, or slider-driven
 	const effectiveFontSize = distanceMode ? distanceFontSize : gyroMode ? gyroFontSize : fontSize
 
+	// useDeferredValue throttles rapid cursor/slider updates; gyro is already rAF-throttled so the
+	// deferral overhead is negligible but harmless — both code paths use the same value
 	const dFontSize = useDeferredValue(effectiveFontSize)
 	const dHysteresis = useDeferredValue(hysteresis)
 
@@ -194,14 +211,14 @@ export default function Demo() {
 	}, [gyroMode])
 
 	// Toggle cursor mode — turns off gyro and distance if active
-	const toggleCursor = () => {
+	const toggleCursor = useCallback(() => {
 		setGyroMode(false)
 		setDistanceMode(false)
 		setCursorMode(v => !v)
-	}
+	}, [])
 
 	// Toggle gyro mode — requests iOS permission if needed, turns off cursor and distance if active
-	const toggleGyro = async () => {
+	const toggleGyro = useCallback(async () => {
 		if (gyroMode) { setGyroMode(false); return }
 		setCursorMode(false)
 		setDistanceMode(false)
@@ -210,21 +227,31 @@ export default function Demo() {
 		}
 		if (typeof DOE.requestPermission === 'function') {
 			const permission = await DOE.requestPermission()
-			if (permission === 'granted') setGyroMode(true)
+			if (permission === 'granted') {
+				setGyroMode(true)
+			} else {
+				// Show denied indicator for 3 s so user knows why tilt did not activate
+				setGyroDenied(true)
+				setTimeout(() => setGyroDenied(false), 3000)
+			}
 		} else {
 			setGyroMode(true)
 		}
-	}
+	}, [gyroMode])
 
-	// Toggle distance mode — turns off cursor and gyro if active
-	const toggleDistance = () => {
+	// Toggle distance mode — resets fontSize to BASE_FONT_SIZE on exit to avoid stale-value jump
+	const toggleDistance = useCallback(() => {
 		setCursorMode(false)
 		setGyroMode(false)
-		setDistanceMode(v => !v)
-	}
+		setDistanceMode(v => {
+			if (v) setFontSize(BASE_FONT_SIZE) // reset slider when exiting so there is no jump
+			return !v
+		})
+	}, [])
 
 	const activeMode = cursorMode || gyroMode || distanceMode
-	const cutInfo = CUT_LABELS[activeCut.family] ?? { name: 'Text', subtitle: '' }
+	// Fall back to the cut whose family matches CUTS[1] to avoid a misleading 'Text' default on mount
+	const cutInfo = CUT_LABELS[activeCut.family] ?? CUT_LABELS[CUTS[1]?.family ?? ''] ?? { name: 'Text', subtitle: '' }
 
 	return (
 		<div className="w-full flex flex-col gap-8">
@@ -243,6 +270,7 @@ export default function Demo() {
 						unit="cm"
 						onChange={setDistance}
 						annotation={`(effective: ${distanceFontSize}px)`}
+						ariaValueText={`${distance}cm, effective font size ${distanceFontSize}px`}
 						subtitle="physical distance to AR-anchored text"
 						title="Drag to simulate viewing distance in AR — closer text appears larger (larger effective size, coarser optical cut), farther text appears smaller (finer optical cut)"
 					/>
@@ -251,11 +279,12 @@ export default function Demo() {
 			</div>
 
 			{/* Mode toggles */}
-			<div className="flex flex-wrap items-center gap-3">
+			<div className="flex flex-wrap items-center gap-3" role="group" aria-label="Interaction mode">
 				{showCursor && (
 					<button
 						onClick={toggleCursor}
-						title="Move cursor up/down to control font size"
+						aria-label={cursorMode ? 'Disable cursor mode (press Escape to exit)' : 'Enable cursor mode — move cursor up/down to control font size'}
+						aria-pressed={cursorMode}
 						className="flex items-center gap-1.5 text-xs px-3 py-1 rounded-full border transition-all"
 						style={{
 							borderColor: 'currentColor',
@@ -264,13 +293,14 @@ export default function Demo() {
 						}}
 					>
 						<CursorIcon />
-						<span>{cursorMode ? 'Esc to exit' : '?'}</span>
+						<span>{cursorMode ? 'Esc to exit' : 'Cursor'}</span>
 					</button>
 				)}
 				{showGyro && (
 					<button
 						onClick={toggleGyro}
-						title="Tilt your device front/back to control font size"
+						aria-label={gyroMode ? 'Disable tilt mode' : 'Enable tilt mode — tilt device front/back to control font size'}
+						aria-pressed={gyroMode}
 						className="flex items-center gap-1.5 text-xs px-3 py-1 rounded-full border transition-all"
 						style={{
 							borderColor: 'currentColor',
@@ -282,9 +312,13 @@ export default function Demo() {
 						<span>{gyroMode ? 'Tilt active' : 'Tilt'}</span>
 					</button>
 				)}
+				{gyroDenied && (
+					<span className="text-xs opacity-70 italic" role="alert">Motion access denied — reload to try again</span>
+				)}
 				<button
 					onClick={toggleDistance}
-					title="Simulate AR viewing distance — closer text appears larger, farther text appears smaller"
+					aria-label={distanceMode ? 'Disable distance mode' : 'Enable distance mode — simulate AR viewing distance to control font size'}
+					aria-pressed={distanceMode}
 					className="flex items-center gap-1.5 text-xs px-3 py-1 rounded-full border transition-all"
 					style={{
 						borderColor: 'currentColor',
@@ -297,8 +331,8 @@ export default function Demo() {
 				</button>
 			</div>
 
-			{/* Active cut indicator */}
-			<div className="flex flex-col gap-2">
+			{/* Active cut indicator — aria-live announces cut transitions to screen readers */}
+			<div className="flex flex-col gap-2" aria-live="polite" aria-atomic="true">
 				<div className="flex items-center gap-4 flex-wrap">
 					<CutChips activeName={cutInfo.name} />
 					<span className="text-xs opacity-50">{cutInfo.subtitle}</span>

@@ -5,19 +5,18 @@ import ToolDirectory from "@/components/ToolDirectory"
 import { version } from "../../../package.json"
 import { version as siteVersion } from "../../package.json"
 import SiteFooter from "../components/SiteFooter"
-import { MagnetChar } from "@liiift-studio/magnettype"
 
 export default function Home() {
 	return (
 		<main className="flex flex-col items-center px-6 py-20 gap-24">
 
 			{/* Hero */}
-			<section className="w-full max-w-2xl lg:max-w-5xl flex flex-col gap-6">
+			<section className="w-full max-w-2xl lg:max-w-5xl flex flex-col gap-6" aria-labelledby="hero-heading">
 				<div className="flex flex-col gap-2">
 					<p className="text-xs uppercase tracking-widest opacity-50">opszstepper</p>
-					<h1 className="text-4xl lg:text-8xl xl:text-9xl" style={{ fontFamily: "var(--font-merriweather), serif", fontVariationSettings: '"wght" 300, "opsz" 144', lineHeight: "1.05em" }}>
-						<MagnetChar as="span" minWeight={300} maxWeight={800} spreadRadius={220} fixedAxes={{ opsz: 144 }}>Optical cuts,</MagnetChar><br />
-						<MagnetChar as="span" minWeight={300} maxWeight={800} spreadRadius={220} fixedAxes={{ opsz: 144 }} style={{ opacity: 0.5, fontStyle: "italic" }}>on demand.</MagnetChar>
+					<h1 id="hero-heading" className="text-4xl lg:text-8xl xl:text-9xl" style={{ fontFamily: "var(--font-cormorant-display), serif", fontVariationSettings: '"wght" 300', lineHeight: "1.05em" }}>
+						Optical cuts,<br />
+						<span style={{ opacity: 0.5, fontStyle: "italic" }}>on demand.</span>
 					</h1>
 				</div>
 				<div className="flex items-center gap-4">
@@ -33,7 +32,7 @@ export default function Home() {
 			</section>
 
 			{/* Demo */}
-			<section className="w-full max-w-2xl lg:max-w-5xl flex flex-col gap-4">
+			<section className="w-full max-w-2xl lg:max-w-5xl flex flex-col gap-4" aria-label="Live demo">
 				<p className="text-xs uppercase tracking-widest opacity-50">Live demo — drag the sliders</p>
 				<div className="rounded-xl -mx-8 px-8 py-8" style={{ background: "rgba(0,0,0,0.25)", overflow: 'hidden' }}>
 					<Demo />
@@ -41,8 +40,8 @@ export default function Home() {
 			</section>
 
 			{/* Explanation */}
-			<section className="w-full max-w-2xl lg:max-w-5xl flex flex-col gap-6">
-				<p className="text-xs uppercase tracking-widest opacity-50">How it works</p>
+			<section className="w-full max-w-2xl lg:max-w-5xl flex flex-col gap-6" aria-labelledby="how-it-works-heading">
+				<p id="how-it-works-heading" className="text-xs uppercase tracking-widest opacity-50">How it works</p>
 				<div className="prose-grid grid grid-cols-1 sm:grid-cols-2 gap-12 text-sm leading-relaxed opacity-70">
 					<div className="flex flex-col gap-3">
 						<p className="font-semibold opacity-100 text-base">Optical sizes are different drawings</p>
@@ -64,9 +63,9 @@ export default function Home() {
 			</section>
 
 			{/* Usage */}
-			<section className="w-full max-w-2xl lg:max-w-5xl flex flex-col gap-6">
+			<section className="w-full max-w-2xl lg:max-w-5xl flex flex-col gap-6" aria-labelledby="usage-heading">
 				<div className="flex items-baseline gap-4">
-					<p className="text-xs uppercase tracking-widest opacity-50">Usage</p>
+					<p id="usage-heading" className="text-xs uppercase tracking-widest opacity-50">Usage</p>
 					<p className="text-xs opacity-50 tracking-wide">TypeScript + React · Vanilla JS</p>
 				</div>
 				<div className="flex flex-col gap-8 text-sm">
@@ -86,23 +85,45 @@ export default function Home() {
 						<p className="opacity-50">Hook — attach to any element</p>
 						<CodeBlock code={`import { useOpszStepper } from '@liiift-studio/opszstepper'
 
-const ref = useOpszStepper({ cuts })
+const ref = useOpszStepper({ cuts, hysteresis: 2, onCutChange: (cut) => console.log(cut) })
 <p ref={ref}>Your text</p>`} />
 					</div>
 					<div className="flex flex-col gap-3">
 						<p className="opacity-50">Vanilla JS</p>
-						<CodeBlock code={`import { startOpszStepper } from '@liiift-studio/opszstepper'
+						<CodeBlock code={`import { startOpszStepper, applyOpszStepper, removeOpszStepper } from '@liiift-studio/opszstepper'
 
 const el = document.querySelector('h1')
+
+// Live — ResizeObserver watches the element and re-evaluates on every font-size change
 const stop = startOpszStepper(el, { cuts })
-// Call stop() to disconnect and restore original fontFamily`} />
+stop() // disconnects observer and restores original fontFamily (same as removeOpszStepper)
+
+// One-shot — apply the correct cut for the current font-size and return
+applyOpszStepper(el, { cuts })
+removeOpszStepper(el) // restore original fontFamily`} />
+					</div>
+					<div className="flex flex-col gap-3">
+						<p className="opacity-50">Variable font — single opsz axis</p>
+						<CodeBlock code={`// For variable fonts with an opsz axis (e.g. Fraunces, Amstelvar), set opszValue per cut.
+// The tool writes font-variation-settings: "opsz" <value> instead of swapping font-family.
+import { OpszStepperText } from '@liiift-studio/opszstepper'
+
+<OpszStepperText cuts={[
+  { family: 'Fraunces, serif', maxSize: 13,            opszValue: 9,  opszMin: 9, opszMax: 144 },
+  { family: 'Fraunces, serif', minSize: 13, maxSize: 28, opszValue: 24, opszMin: 9, opszMax: 144 },
+  { family: 'Fraunces, serif', minSize: 28,            opszValue: 72, opszMin: 9, opszMax: 144 },
+]}>
+  Your text here
+</OpszStepperText>`} />
 					</div>
 					<div className="flex flex-col gap-3">
 						<p className="opacity-50">Options</p>
-						<table className="w-full text-xs">
+						<table className="w-full text-xs" aria-label="OpszStepper options reference">
 							<thead><tr className="opacity-50 text-left"><th className="pb-2 pr-6 font-normal">Option</th><th className="pb-2 pr-6 font-normal">Default</th><th className="pb-2 font-normal">Description</th></tr></thead>
 							<tbody className="opacity-70">
 								<tr className="border-t border-white/10 hover:bg-white/5 transition-colors"><td className="py-2 pr-6 font-mono">cuts</td><td className="py-2 pr-6">required</td><td className="py-2">Array of <code className="font-mono">OpszStepperCut</code> objects, each with a <code className="font-mono">family</code> string and optional <code className="font-mono">minSize</code>/<code className="font-mono">maxSize</code> in px.</td></tr>
+								<tr className="border-t border-white/10 hover:bg-white/5 transition-colors"><td className="py-2 pr-6 font-mono">cuts[n].opszValue</td><td className="py-2 pr-6">—</td><td className="py-2">Optional <code className="font-mono">opsz</code> axis value to write as <code className="font-mono">font-variation-settings</code>. Use for variable fonts instead of swapping <code className="font-mono">font-family</code>.</td></tr>
+								<tr className="border-t border-white/10 hover:bg-white/5 transition-colors"><td className="py-2 pr-6 font-mono">cuts[n].opszMin / opszMax</td><td className="py-2 pr-6">—</td><td className="py-2">Clamp bounds for the <code className="font-mono">opsz</code> axis value, matching the font&apos;s <code className="font-mono">fvar</code> range.</td></tr>
 								<tr className="border-t border-white/10 hover:bg-white/5 transition-colors"><td className="py-2 pr-6 font-mono">hysteresis</td><td className="py-2 pr-6">1</td><td className="py-2">Dead zone in px at each cut boundary. Prevents oscillation when font-size sits exactly at a threshold.</td></tr>
 								<tr className="border-t border-white/10 hover:bg-white/5 transition-colors"><td className="py-2 pr-6 font-mono">onCutChange</td><td className="py-2 pr-6">—</td><td className="py-2">Callback fired each time the active cut changes. Receives the new <code className="font-mono">OpszStepperCut</code> object.</td></tr>
 								<tr className="border-t border-white/10 hover:bg-white/5 transition-colors"><td className="py-2 pr-6 font-mono">as</td><td className="py-2 pr-6">&apos;p&apos;</td><td className="py-2">HTML element to render. Accepts any valid React element type. (<code className="font-mono">OpszStepperText</code> only)</td></tr>
