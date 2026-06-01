@@ -82,6 +82,7 @@ function Slider({ label, value, min, max, step, unit, onChange, subtitle, annota
 					{value}{unit}{annotation ? <span className="ml-1 opacity-70">{annotation}</span> : null}
 				</span>
 			</div>
+			{/* touchAction: pan-y lets the page scroll vertically while still allowing horizontal thumb drags */}
 			<input
 				type="range"
 				min={min}
@@ -93,8 +94,7 @@ function Slider({ label, value, min, max, step, unit, onChange, subtitle, annota
 				aria-describedby={subtitleId}
 				title={title}
 				onChange={e => onChange(Number(e.target.value))}
-				onTouchStart={e => e.stopPropagation()}
-				style={{ touchAction: 'none' }}
+				style={{ touchAction: 'pan-y' }}
 			/>
 			{subtitle && <span id={subtitleId} className="text-xs opacity-30 italic">{subtitle}</span>}
 		</div>
@@ -171,14 +171,16 @@ export default function Demo() {
 	const dFontSize = useDeferredValue(effectiveFontSize)
 	const dHysteresis = useDeferredValue(hysteresis)
 
-	// Cursor mode — Y controls font-size (top = large, bottom = small)
+	// Cursor mode — Y controls font-size (top = large, bottom = small); ArrowUp/Down step ±1px
 	useEffect(() => {
 		if (!cursorMode) return
 		const handleMove = (e: MouseEvent) => {
 			setFontSize(Math.round(8 + (1 - e.clientY / window.innerHeight) * 88))
 		}
 		const handleKey = (e: KeyboardEvent) => {
-			if (e.key === 'Escape') setCursorMode(false)
+			if (e.key === 'Escape') { setCursorMode(false); return }
+			if (e.key === 'ArrowUp')   { e.preventDefault(); setFontSize(v => Math.min(96, v + 1)); return }
+			if (e.key === 'ArrowDown') { e.preventDefault(); setFontSize(v => Math.max(8,  v - 1)); return }
 		}
 		window.addEventListener('mousemove', handleMove)
 		window.addEventListener('keydown', handleKey)
@@ -283,7 +285,7 @@ export default function Demo() {
 				{showCursor && (
 					<button
 						onClick={toggleCursor}
-						aria-label={cursorMode ? 'Disable cursor mode (press Escape to exit)' : 'Enable cursor mode — move cursor up/down to control font size'}
+						aria-label={cursorMode ? 'Disable cursor mode (Arrow Up/Down to step, Escape to exit)' : 'Enable cursor mode — move cursor up/down or use Arrow Up/Down to control font size'}
 						aria-pressed={cursorMode}
 						className="flex items-center gap-1.5 text-xs px-3 py-1 rounded-full border transition-all"
 						style={{
@@ -377,7 +379,7 @@ export default function Demo() {
 			<p className="text-xs opacity-40 italic" style={{ lineHeight: 1.8 }}>
 				{activeMode
 					? cursorMode
-						? 'Move cursor up for large sizes, down for small. Press Esc to exit.'
+						? 'Move cursor up for large sizes, down for small. Use Arrow Up / Arrow Down to step ±1px. Press Esc to exit.'
 						: gyroMode
 						? 'Tilt device toward you for smaller sizes, upright for larger.'
 						: 'On smart glasses, AR-anchored text at 20 cm appears huge — at 2 m it appears tiny. The Distance slider simulates how far away the text is: as distance grows, the apparent size shrinks and opszStepper swaps to a finer optical cut.'
