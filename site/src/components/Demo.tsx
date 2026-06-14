@@ -77,9 +77,9 @@ function Slider({ label, value, min, max, step, unit, onChange, subtitle, annota
 	return (
 		<div className="flex flex-col gap-1">
 			<div className="flex justify-between items-baseline">
-				<span className="text-xs uppercase tracking-widest opacity-50">{label}</span>
-				<span className="tabular-nums text-xs opacity-50">
-					{value}{unit}{annotation ? <span className="ml-1 opacity-70">{annotation}</span> : null}
+				<span className="text-xs uppercase tracking-[0.18em] font-medium text-muted">{label}</span>
+				<span className="tabular-nums text-xs text-muted">
+					{value}{unit}{annotation ? <span className="ml-1 text-subtle">{annotation}</span> : null}
 				</span>
 			</div>
 			{/* touchAction: pan-y lets the page scroll vertically while still allowing horizontal thumb drags */}
@@ -96,7 +96,7 @@ function Slider({ label, value, min, max, step, unit, onChange, subtitle, annota
 				onChange={e => onChange(Number(e.target.value))}
 				style={{ touchAction: 'pan-y' }}
 			/>
-			{subtitle && <span id={subtitleId} className="text-xs opacity-30 italic">{subtitle}</span>}
+			{subtitle && <span id={subtitleId} className="text-xs text-subtle italic">{subtitle}</span>}
 		</div>
 	)
 }
@@ -315,7 +315,7 @@ export default function Demo() {
 					</button>
 				)}
 				{gyroDenied && (
-					<span className="text-xs opacity-70 italic" role="alert">Motion access denied — reload to try again</span>
+					<span className="text-xs text-subtle italic" role="alert">Motion access denied — reload to try again</span>
 				)}
 				<button
 					onClick={toggleDistance}
@@ -337,7 +337,7 @@ export default function Demo() {
 			<div className="flex flex-col gap-2" aria-live="polite" aria-atomic="true">
 				<div className="flex items-center gap-4 flex-wrap">
 					<CutChips activeName={cutInfo.name} />
-					<span className="text-xs opacity-50">{cutInfo.subtitle}</span>
+					<span className="text-xs text-muted">{cutInfo.subtitle}</span>
 				</div>
 			</div>
 
@@ -358,7 +358,7 @@ export default function Demo() {
 			</div>
 
 			{/* Cut reference legend */}
-			<div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs opacity-50">
+			<div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs text-muted">
 				{CUTS.map((cut) => {
 					const info = CUT_LABELS[cut.family]
 					const range = cut.minSize !== undefined && cut.maxSize !== undefined
@@ -368,15 +368,15 @@ export default function Demo() {
 						: `≥ ${cut.minSize}px`
 					return (
 						<div key={cut.family} className="flex flex-col gap-0.5">
-							<span className="font-semibold opacity-100">{info?.name} cut</span>
+							<span className="font-semibold">{info?.name} cut</span>
 							<span>{info?.subtitle.split(' — ')[0]}</span>
-							<span className="opacity-60">{range}</span>
+							<span className="text-subtle">{range}</span>
 						</div>
 					)
 				})}
 			</div>
 
-			<p className="text-xs opacity-40 italic" style={{ lineHeight: 1.8 }}>
+			<p className="text-xs text-subtle italic" style={{ lineHeight: 1.8 }}>
 				{activeMode
 					? cursorMode
 						? 'Move cursor up for large sizes, down for small. Use Arrow Up / Arrow Down to step ±1px. Press Esc to exit.'
