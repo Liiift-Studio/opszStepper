@@ -4,7 +4,7 @@
 
 :root {
 	--background: oklch(0.12 0.0400 243);
-	--foreground: oklch(0.93 0.03 243);
+	--foreground: oklch(0.97 0.008 243);
 	--foreground-muted: oklch(0.78 0.025 243);
 	--foreground-subtle: oklch(0.66 0.020 243);
 	--foreground-faint: oklch(0.55 0.016 243);
